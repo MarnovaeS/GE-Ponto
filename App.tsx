@@ -1,10 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { collection, onSnapshot, query, orderBy, doc, setDoc, updateDoc, deleteDoc, addDoc } from "firebase/firestore";
 import { auth, db } from './firebaseConfig';
 import { User, TimePunch, UserRole } from './types';
+import { MOCK_USERS } from './constants';
 import Layout from './components/Layout';
 import Login from './views/Login';
 import Dashboard from './views/Dashboard';
@@ -14,16 +14,23 @@ import UserManagement from './views/UserManagement';
 import SystemDocs from './views/SystemDocs';
 
 const App: React.FC = () => {
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<User[]>(MOCK_USERS);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [punches, setPunches] = useState<TimePunch[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // 1. Escutar estado de autenticação
+  // Detecção de modo Demo vs Produção
+  const isDemo = auth.config.apiKey === "AIzaSyAs-SUA-API-KEY";
+
   useEffect(() => {
+    if (isDemo) {
+      console.warn("⚠️ Energe Ponto rodando em modo DEMO. Configure firebaseConfig.ts para produção.");
+      setLoading(false);
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // Buscar dados do perfil do usuário no Firestore
         const userDoc = doc(db, "users", firebaseUser.uid);
         onSnapshot(userDoc, (snap) => {
           if (snap.exists()) {
@@ -36,73 +43,80 @@ const App: React.FC = () => {
       setLoading(false);
     });
     return () => unsubscribe();
-  }, []);
+  }, [isDemo]);
 
-  // 2. Escutar lista de usuários (apenas para Admin/Manager)
+  // Sincronização de dados
   useEffect(() => {
-    if (!currentUser || currentUser.role === UserRole.EMPLOYEE) return;
+    if (!currentUser || isDemo) return;
 
-    const q = query(collection(db, "users"), orderBy("name"));
-    const unsubscribe = onSnapshot(q, (snap) => {
-      const usersList = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-      setUsers(usersList);
+    const qUsers = query(collection(db, "users"), orderBy("name"));
+    const unsubUsers = onSnapshot(qUsers, (snap) => {
+      setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() } as User)));
     });
-    return () => unsubscribe();
-  }, [currentUser]);
 
-  // 3. Escutar batidas de ponto
-  useEffect(() => {
-    if (!currentUser) return;
-
-    // Se for admin, vê tudo. Se for funcionário, vê só as dele.
-    const punchesRef = collection(db, "punches");
-    const q = currentUser.role === UserRole.ADMIN 
-      ? query(punchesRef, orderBy("timestamp", "desc"))
-      : query(punchesRef, orderBy("timestamp", "desc")); // Em prod, adicionar filtro where("userId", "==", currentUser.id)
-
-    const unsubscribe = onSnapshot(q, (snap) => {
-      const punchList = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as TimePunch));
-      setPunches(punchList);
+    const qPunches = query(collection(db, "punches"), orderBy("timestamp", "desc"));
+    const unsubPunches = onSnapshot(qPunches, (snap) => {
+      setPunches(snap.docs.map(d => ({ id: d.id, ...d.data() } as TimePunch)));
     });
-    return () => unsubscribe();
-  }, [currentUser]);
+
+    return () => { unsubUsers(); unsubPunches(); };
+  }, [currentUser, isDemo]);
 
   const handleLogin = async (identifier: string, password?: string) => {
+    if (isDemo) {
+      const user = MOCK_USERS.find(u => u.email === identifier || u.username === identifier);
+      if (user && password === "123") {
+        setCurrentUser(user);
+      } else {
+        alert("Usuário demo inválido. Use admin@empresa.com / 123");
+      }
+      return;
+    }
+
     try {
-      // Nota: Em produção, você mapearia 'username' para 'email' ou usaria login customizado
-      // Aqui simplificamos assumindo que o login é por email
       await signInWithEmailAndPassword(auth, identifier, password || "");
     } catch (error: any) {
-      alert(`Erro no login: ${error.message}`);
+      alert(`Erro: ${error.message}`);
     }
   };
 
-  const handleLogout = () => signOut(auth);
+  const handleLogout = () => {
+    if (isDemo) {
+      setCurrentUser(null);
+      return;
+    }
+    signOut(auth);
+  };
 
   const addPunch = async (punch: TimePunch) => {
+    if (isDemo) {
+      setPunches(prev => [punch, ...prev]);
+      return;
+    }
     await addDoc(collection(db, "punches"), punch);
   };
 
   const handleAddUser = async (user: User) => {
-    // Nota: Em prod, criar o usuário no Firebase Auth via Cloud Function
-    // Aqui apenas salvamos o documento do perfil
+    if (isDemo) { setUsers(p => [...p, user]); return; }
     await setDoc(doc(db, "users", user.id), user);
   };
 
   const handleUpdateUser = async (updatedUser: User) => {
+    if (isDemo) { setUsers(p => p.map(u => u.id === updatedUser.id ? updatedUser : u)); return; }
     const { id, ...data } = updatedUser;
     await updateDoc(doc(db, "users", id), data);
   };
 
   const handleDeleteUser = async (id: string) => {
-    if (confirm('Remover colaborador e dados permanentemente?')) {
-      await deleteDoc(doc(db, "users", id));
-    }
+    if (!confirm('Deseja remover este colaborador?')) return;
+    if (isDemo) { setUsers(p => p.filter(u => u.id !== id)); return; }
+    await deleteDoc(doc(db, "users", id));
   };
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-900">
-      <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-950 gap-6">
+      <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+      <p className="text-indigo-400 font-black tracking-widest text-[10px] uppercase">Inicializando Energe Ponto</p>
     </div>
   );
 

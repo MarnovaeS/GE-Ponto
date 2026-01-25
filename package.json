@@ -2,21 +2,30 @@
   "name": "ponto-smart-energe",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "dependencies": {
-    "react": "^19.2.3",
-    "react-dom": "^19.2.3",
-    "react-router-dom": "^7.13.0",
-    "recharts": "^3.7.0",
-    "firebase": "^10.8.0",
-    "@capacitor/core": "^6.0.0",
-    "@capacitor/android": "^6.0.0"
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^7.1.0",
+    "recharts": "^2.15.0",
+    "firebase": "^10.13.0",
+    "lucide-react": "^0.450.0",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^2.5.2"
   },
   "devDependencies": {
-    "@capacitor/cli": "^6.0.0",
-    "typescript": "^5.0.0"
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.13",
+    "typescript": "^5.6.3",
+    "vite": "^6.0.0"
   },
   "scripts": {
-    "start": "npx serve .",
-    "build": "mkdir -p dist && cp -r . dist/ && rm -rf dist/node_modules dist/.git"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
   }
 }
