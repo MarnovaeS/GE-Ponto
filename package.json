@@ -1,0 +1,22 @@
+{
+  "name": "ponto-smart-energe",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "react-router-dom": "^7.13.0",
+    "recharts": "^3.7.0",
+    "firebase": "^10.8.0",
+    "@capacitor/core": "^6.0.0",
+    "@capacitor/android": "^6.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.0.0",
+    "typescript": "^5.0.0"
+  },
+  "scripts": {
+    "start": "npx serve .",
+    "build": "mkdir -p dist && cp -r . dist/ && rm -rf dist/node_modules dist/.git"
+  }
+}

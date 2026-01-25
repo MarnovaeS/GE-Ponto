@@ -1,0 +1,8 @@
+{
+  "name": "Energe APP Ponto",
+  "description": "Sistema completo de controle de ponto eletrônico com geolocalização, dashboard administrativo e múltiplos perfis de acesso.",
+  "requestFramePermissions": [
+    "geolocation",
+    "camera"
+  ]
+}
