@@ -1,0 +1,77 @@
+rules_version = '2';
+
+// ============================================================
+// GE-Ponto — Regras de Segurança do Firestore
+// ============================================================
+// Como publicar:
+//   firebase deploy --only firestore:rules
+//
+// Ou cole diretamente em:
+//   console.firebase.google.com > Firestore > Regras
+// ============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- Funções auxiliares ---
+
+    // Verifica se o usuário está autenticado
+    function isAuthed() {
+      return request.auth != null;
+    }
+
+    // Obtém o perfil do usuário logado do Firestore
+    function userProfile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // Verifica se é administrador
+    function isAdmin() {
+      return isAuthed() && userProfile().role == 'ADMIN';
+    }
+
+    // Verifica se é gestor ou administrador
+    function isManagerOrAdmin() {
+      return isAuthed() && userProfile().role in ['ADMIN', 'MANAGER'];
+    }
+
+    // --------------------------------------------------------
+    // Coleção: users
+    // --------------------------------------------------------
+    match /users/{userId} {
+      // Qualquer usuário autenticado pode ver outros usuários
+      allow read: if isAuthed();
+
+      // Só admin pode criar novos usuários
+      allow create: if isAdmin();
+
+      // Admin pode editar qualquer usuário; usuário pode editar o próprio perfil
+      // (exceto o campo role — só admin muda isso)
+      allow update: if isAdmin() ||
+        (isAuthed() && request.auth.uid == userId &&
+         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']));
+
+      // Só admin pode deletar
+      allow delete: if isAdmin();
+    }
+
+    // --------------------------------------------------------
+    // Coleção: punches (registros de ponto)
+    // --------------------------------------------------------
+    match /punches/{punchId} {
+      // Funcionário vê só os próprios; gestor/admin vê todos
+      allow read: if isAuthed() && (
+        isManagerOrAdmin() ||
+        resource.data.userId == request.auth.uid
+      );
+
+      // Qualquer autenticado pode registrar ponto (para si mesmo)
+      allow create: if isAuthed() &&
+        request.resource.data.userId == request.auth.uid;
+
+      // Só admin ou gestor podem editar/excluir registros
+      allow update, delete: if isManagerOrAdmin();
+    }
+
+  }
+}
